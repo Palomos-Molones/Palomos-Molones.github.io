@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+import { CSSProperties, StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
@@ -17,9 +17,166 @@ const telemetry = [
   ["Deploy mood", "luminous"],
 ];
 
+type AudioContextWindow = Window &
+  typeof globalThis & {
+    webkitAudioContext?: typeof AudioContext;
+  };
+
+type CursorTrail = {
+  id: number;
+  x: number;
+  y: number;
+  born: number;
+  kind: "crumb" | "feather" | "pigeon";
+  driftX: number;
+  driftY: number;
+  angle: number;
+  scale: number;
+};
+
+const trailKinds: CursorTrail["kind"][] = ["crumb", "feather", "pigeon", "crumb", "feather"];
+
+function playPrruPrru(audioContextRef: React.MutableRefObject<AudioContext | null>) {
+  const AudioContextConstructor = window.AudioContext || (window as AudioContextWindow).webkitAudioContext;
+
+  if (!AudioContextConstructor) {
+    return;
+  }
+
+  const context = audioContextRef.current ?? new AudioContextConstructor();
+  audioContextRef.current = context;
+
+  if (context.state === "suspended") {
+    void context.resume();
+  }
+
+  const now = context.currentTime;
+  const master = context.createGain();
+  master.gain.setValueAtTime(0.0001, now);
+  master.gain.exponentialRampToValueAtTime(0.12, now + 0.025);
+  master.gain.exponentialRampToValueAtTime(0.0001, now + 0.48);
+  master.connect(context.destination);
+
+  [0, 0.23].forEach((offset) => {
+    const oscillator = context.createOscillator();
+    const wobble = context.createOscillator();
+    const wobbleGain = context.createGain();
+
+    oscillator.type = "triangle";
+    oscillator.frequency.setValueAtTime(190, now + offset);
+    oscillator.frequency.exponentialRampToValueAtTime(132, now + offset + 0.18);
+
+    wobble.type = "sine";
+    wobble.frequency.setValueAtTime(28, now + offset);
+    wobbleGain.gain.setValueAtTime(18, now + offset);
+    wobble.connect(wobbleGain);
+    wobbleGain.connect(oscillator.frequency);
+
+    oscillator.connect(master);
+    wobble.start(now + offset);
+    oscillator.start(now + offset);
+    wobble.stop(now + offset + 0.2);
+    oscillator.stop(now + offset + 0.2);
+  });
+}
+
+function PigeonCursor() {
+  const [trail, setTrail] = useState<CursorTrail[]>([]);
+  const idRef = useRef(0);
+  const lastMoveRef = useRef(0);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const reducedMotionRef = useRef(false);
+
+  useEffect(() => {
+    const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const syncReducedMotion = () => {
+      reducedMotionRef.current = motionQuery.matches;
+      if (motionQuery.matches) {
+        setTrail([]);
+      }
+    };
+
+    syncReducedMotion();
+    motionQuery.addEventListener("change", syncReducedMotion);
+
+    const cleanup = window.setInterval(() => {
+      const cutoff = Date.now() - 950;
+      setTrail((currentTrail) => currentTrail.filter((particle) => particle.born > cutoff));
+    }, 200);
+
+    return () => {
+      motionQuery.removeEventListener("change", syncReducedMotion);
+      window.clearInterval(cleanup);
+      void audioContextRef.current?.close();
+    };
+  }, []);
+
+  function handlePointerMove(event: React.PointerEvent<HTMLElement>) {
+    if (reducedMotionRef.current) {
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastMoveRef.current < 36) {
+      return;
+    }
+
+    lastMoveRef.current = now;
+    const id = idRef.current++;
+    const kind = trailKinds[id % trailKinds.length];
+
+    setTrail((currentTrail) => [
+      ...currentTrail.slice(-32),
+      {
+        id,
+        kind,
+        x: event.clientX,
+        y: event.clientY,
+        born: now,
+        driftX: Math.round((Math.random() * 44 - 22) * 10) / 10,
+        driftY: Math.round((Math.random() * -38 - 10) * 10) / 10,
+        angle: Math.round(Math.random() * 80 - 40),
+        scale: Math.round((0.82 + Math.random() * 0.46) * 100) / 100,
+      },
+    ]);
+  }
+
+  function handleClick() {
+    playPrruPrru(audioContextRef);
+  }
+
+  return (
+    <main
+      className="min-h-screen overflow-hidden bg-[#050507] text-white"
+      onClickCapture={handleClick}
+      onPointerMove={handlePointerMove}
+    >
+      <div className="pigeon-trail" aria-hidden="true">
+        {trail.map((particle) => (
+          <span
+            className={`trail-particle trail-${particle.kind}`}
+            key={particle.id}
+            style={
+              {
+                left: particle.x,
+                top: particle.y,
+                "--drift-x": `${particle.driftX}px`,
+                "--drift-y": `${particle.driftY}px`,
+                "--angle": `${particle.angle}deg`,
+                "--scale": particle.scale,
+              } as CSSProperties
+            }
+          />
+        ))}
+      </div>
+      <App />
+    </main>
+  );
+}
+
 function App() {
   return (
-    <main className="min-h-screen overflow-hidden bg-[#050507] text-white">
+    <>
       <section className="relative min-h-screen isolate flex items-center">
         <img
           src="/palomos-chaos.png"
@@ -95,12 +252,12 @@ function App() {
           ))}
         </div>
       </section>
-    </main>
+    </>
   );
 }
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <PigeonCursor />
   </StrictMode>,
 );
