@@ -16,6 +16,64 @@ a {
   text-decoration: none;
 }
 
+.pigeon-trail {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.trail-particle {
+  position: absolute;
+  width: 1rem;
+  height: 1rem;
+  transform: translate3d(-50%, -50%, 0) rotate(var(--angle)) scale(var(--scale));
+  animation: trail-fade 950ms ease-out forwards;
+  will-change: transform, opacity;
+}
+
+.trail-crumb {
+  width: 0.44rem;
+  height: 0.44rem;
+  background: #facc15;
+  box-shadow:
+    0.4rem -0.22rem 0 -0.12rem #fde68a,
+    -0.28rem 0.34rem 0 -0.16rem #fb923c;
+}
+
+.trail-feather {
+  width: 1.1rem;
+  height: 0.32rem;
+  border-radius: 999px 999px 999px 0;
+  background: linear-gradient(90deg, #fafafa 0 48%, #a5f3fc 50% 100%);
+  box-shadow: 0 0 12px rgba(165, 243, 252, 0.52);
+}
+
+.trail-feather::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -0.18rem;
+  width: 1px;
+  height: 0.72rem;
+  background: rgba(5, 5, 7, 0.72);
+  transform: rotate(16deg);
+}
+
+.trail-pigeon {
+  width: 1rem;
+  height: 0.7rem;
+  image-rendering: pixelated;
+  background:
+    linear-gradient(#d4d4d8 0 0) 0.18rem 0.22rem / 0.34rem 0.34rem no-repeat,
+    linear-gradient(#a1a1aa 0 0) 0.5rem 0.34rem / 0.34rem 0.22rem no-repeat,
+    linear-gradient(#67e8f9 0 0) 0.7rem 0.16rem / 0.12rem 0.12rem no-repeat,
+    linear-gradient(#f97316 0 0) 0.82rem 0.28rem / 0.22rem 0.1rem no-repeat,
+    linear-gradient(#facc15 0 0) 0.3rem 0.58rem / 0.1rem 0.16rem no-repeat,
+    linear-gradient(#facc15 0 0) 0.58rem 0.58rem / 0.1rem 0.16rem no-repeat;
+  filter: drop-shadow(0 0 8px rgba(103, 232, 249, 0.42));
+}
+
 .signal {
   display: inline-flex;
   min-height: 2rem;
@@ -159,6 +217,20 @@ a {
   }
 }
 
+@keyframes trail-fade {
+  0% {
+    opacity: 0.96;
+    transform: translate3d(-50%, -50%, 0) rotate(var(--angle)) scale(var(--scale));
+  }
+  100% {
+    opacity: 0;
+    transform:
+      translate3d(calc(-50% + var(--drift-x)), calc(-50% + var(--drift-y)), 0)
+      rotate(calc(var(--angle) + 36deg))
+      scale(0.3);
+  }
+}
+
 @media (max-width: 820px) {
   .agent {
     display: none;
@@ -174,5 +246,9 @@ a {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
+  }
+
+  .pigeon-trail {
+    display: none;
   }
 }
